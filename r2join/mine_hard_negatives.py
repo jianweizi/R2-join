@@ -147,7 +147,8 @@ def build_public_dataset(config: dict, output_dir: Path):
         gt_df = pd.read_csv(gt_file, header=None)
     corpus = {}
     global_gt = defaultdict(set)
-    edges = set()
+    edges = []
+    seen_edges = set()
     skipped = Counter()
 
     for table1, table2, col1, col2 in tqdm(list(iter_ground_truth_rows(gt_df, gt_format)), desc="Parse ground truth"):
@@ -157,9 +158,13 @@ def build_public_dataset(config: dict, output_dir: Path):
         if key is None:
             skipped["self_edges"] += 1
             continue
-        edges.add(key)
         global_gt[id1].add(id2)
         global_gt[id2].add(id1)
+        if key in seen_edges:
+            skipped["duplicate_or_reverse_edges"] += 1
+            continue
+        seen_edges.add(key)
+        edges.append(key)
 
         for table_name, column_name, col_id in [(table1, col1, id1), (table2, col2, id2)]:
             if col_id in corpus:

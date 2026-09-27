@@ -211,14 +211,10 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(base_model)
     dataset = ListwiseDataset(data_dir, FeatureExtractor(feature_dim), num_negatives)
 
-    val_size = max(1, int(len(dataset) * val_ratio)) if len(dataset) > 1 else 0
+    val_size = int(len(dataset) * val_ratio)
     train_size = len(dataset) - val_size
     if val_size:
-        train_dataset, val_dataset = random_split(
-            dataset,
-            [train_size, val_size],
-            generator=torch.Generator().manual_seed(seed),
-        )
+        train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
     else:
         train_dataset, val_dataset = dataset, dataset
 

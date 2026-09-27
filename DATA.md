@@ -5,38 +5,21 @@ Large datasets are not stored in this Git repository.
 ## Public Datasets
 
 OpenData and WebTable are public datasets used for joinable table discovery.
-The raw datasets, query files, and ground-truth files are available from
-LakeBench:
+The experiments use the LakeBench release:
 
 https://github.com/BIT-DataLab/LakeBench
 
-For OpenData and WebTable, use the join-search resources listed in the
-Prepare Datasets table of the LakeBench README. In particular, R2-Join uses
-the following raw resources before conversion to the processed format below:
-
-- WebTable
-- OpenData_SG
-- OpenData_CAN
-- OpenData_UK
-- OpenData_USA
-- WebTable_Join_Query
-- WebTable_Join_Ground_Truth
-- OpenData_Join_Query
-- OpenData_Join_Ground_Truth
-
-The raw files are not redistributed in this repository because of their size.
-After downloading them, convert them into the R2-Join processed format described
-below.
+Download the OpenData and WebTable table files and the join ground-truth files,
+then edit `configs/opendata.json` and `configs/webtable.json` so that
+`ground_truth_file` and `raw_data_dirs` point to your local copy.
 
 ## Odoo
 
 Odoo is an ERP-derived dataset used to evaluate R2-Join on enterprise schemas.
 We do not redistribute the Odoo dataset in this public repository because it is
 derived from ERP application data and may contain schema-specific information.
-For transparency, this repository documents the expected processed file format
-below and includes `sample_data/` as a runnable example. The Odoo results in
-`RESULTS.md` were produced from an internal processed version following the same
-format.
+The Odoo results in `RESULTS.md` were produced from an internal processed
+version following the same file format below.
 
 ## Expected Processed Format
 
@@ -83,14 +66,26 @@ split_manifest.json
 ```json
 [
   {
-    "query_id": "table_a.city",
-    "positive_id": "table_b.city_name",
-    "hard_negatives": ["table_c.country"]
+    "query_col": "table_a.city",
+    "positive_col": "table_b.city_name",
+    "query": "[Table] table_a; [Column] city; [Values] Paris, Lyon",
+    "positive": "[Table] table_b; [Column] city_name; [Values] Paris, Rome",
+    "label": 1,
+    "negatives_list": [
+      "[Table] table_c; [Column] country; [Values] France, Germany"
+    ]
   }
 ]
 ```
 
-The scripts also accept several common field aliases such as `query`,
-`positive`, `pos_id`, `negative_ids`, and `negatives`.
+The training scripts also accept several common field aliases such as
+`query_id`, `positive_id`, `hard_negatives`, and `negatives`.
 
+## Reproducing the Paper Results
 
+For OpenData and WebTable, use the raw LakeBench files and run
+`r2join.mine_hard_negatives` with the corresponding config. For Odoo, place an
+authorized processed copy under the path configured by `configs/odoo.json`.
+
+Do not commit large raw tables, trained model files, embedding caches, or logs
+to Git.

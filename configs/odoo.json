@@ -1,0 +1,17 @@
+{
+  "dataset": "odoo",
+  "prepare_mode": "existing_split",
+  "data_dir": "processed/odoo",
+  "source_data_dir": "data/odoo",
+  "stage1_base_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "stage2_base_model": "cross-encoder/ms-marco-MiniLM-L12-v2",
+  "stage1_output_dir": "models/odoo/stage1_biencoder",
+  "stage2_output_dir": "models/odoo/stage2_reranker_beta0.5",
+  "stage2_best_model_dir": "models/odoo/stage2_reranker_beta0.5/best_model",
+  "eval_output_file": "outputs/odoo/full_pipeline_results.json",
+  "top_k_retrieval": 100,
+  "rerank_top_k": 50,
+  "num_negatives": 7,
+  "metric_k": [1, 5, 10, 20, 50],
+  "seed": 42
+}

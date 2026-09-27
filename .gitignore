@@ -10,6 +10,9 @@ processed/
 models/
 outputs/
 logs/
+data/
+checkpoints/
+wandb/
 
 # Large artifacts
 *.bin

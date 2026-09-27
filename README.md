@@ -4,9 +4,9 @@ R2-Join is a two-stage retrieval-reranking method for joinable table discovery.
 Given a query column, it first retrieves candidate columns with a bi-encoder and
 then reranks the retrieved pairs with a cross-encoder.
 
-This repository is intentionally lightweight. Large public datasets, trained
-models, and embedding caches are not stored in Git. See `DATA.md` for dataset
-instructions and expected file formats.
+This repository contains the experiment code used for the paper. Large public
+datasets, trained checkpoints, and embedding caches are not stored in Git. See
+`DATA.md` for dataset instructions and expected file formats.
 
 ## Install
 
@@ -16,98 +16,54 @@ conda activate r2join
 pip install -r requirements.txt
 ```
 
-## Quick Demo
+## Smoke Check
 
-Run the toy example without downloading any large model:
+Run a lightweight repository check without downloading model checkpoints:
 
 ```bash
 bash run_demo.sh
 ```
 
-The demo creates processed sample data and evaluates a lexical fallback ranker.
-It is only a smoke test for the repository workflow.
+This verifies Python syntax and the sample-data schema. Full experiments require
+the datasets and pretrained models described below.
 
 ## Full Workflow
 
-Prepare data:
+Edit one config file in `configs/` so that its paths point to your local dataset
+copy, then run the four-step pipeline.
+
+Prepare data and mine rank-tiered hard negatives:
 
 ```bash
-python r2join/prepare_data.py \
-  --input-dir /path/to/processed_dataset \
-  --output-dir ./processed/opendata \
-  --dataset opendata
+python -m r2join.mine_hard_negatives --config configs/opendata.json
 ```
 
 Train the Stage I retriever:
 
 ```bash
-python r2join/train_retriever.py \
-  --data-dir ./processed/opendata \
-  --output-dir ./models/opendata/retriever
+python -m r2join.train_stage1 --config configs/opendata.json
 ```
 
 Train the Stage II reranker:
 
 ```bash
-python r2join/train_reranker.py \
-  --data-dir ./processed/opendata \
-  --output-dir ./models/opendata/reranker
+python -m r2join.train_stage2 --config configs/opendata.json
 ```
 
 Evaluate:
 
 ```bash
-python r2join/evaluate.py \
-  --data-dir ./processed/opendata \
-  --retriever-model ./models/opendata/retriever \
-  --reranker-model ./models/opendata/reranker \
-  --split test
+python -m r2join.evaluate_full_pipeline --config configs/opendata.json
 ```
 
 ## Reproducing Main Results
 
-After preparing each dataset in the format described in `DATA.md`, use the
-following commands to train and evaluate R2-Join on each dataset.
+After preparing each dataset in the format described in `DATA.md`, run:
 
 ```bash
-# OpenData
-python r2join/train_retriever.py \
-  --data-dir ./processed/opendata \
-  --output-dir ./models/opendata/retriever
-python r2join/train_reranker.py \
-  --data-dir ./processed/opendata \
-  --output-dir ./models/opendata/reranker
-python r2join/evaluate.py \
-  --data-dir ./processed/opendata \
-  --retriever-model ./models/opendata/retriever \
-  --reranker-model ./models/opendata/reranker \
-  --split test
-
-# WebTable
-python r2join/train_retriever.py \
-  --data-dir ./processed/webtable \
-  --output-dir ./models/webtable/retriever
-python r2join/train_reranker.py \
-  --data-dir ./processed/webtable \
-  --output-dir ./models/webtable/reranker
-python r2join/evaluate.py \
-  --data-dir ./processed/webtable \
-  --retriever-model ./models/webtable/retriever \
-  --reranker-model ./models/webtable/reranker \
-  --split test
-
-# Odoo
-python r2join/train_retriever.py \
-  --data-dir ./processed/odoo \
-  --output-dir ./models/odoo/retriever
-python r2join/train_reranker.py \
-  --data-dir ./processed/odoo \
-  --output-dir ./models/odoo/reranker
-python r2join/evaluate.py \
-  --data-dir ./processed/odoo \
-  --retriever-model ./models/odoo/retriever \
-  --reranker-model ./models/odoo/reranker \
-  --split test
+bash scripts/run_opendata.sh
+bash scripts/run_webtable.sh
+bash scripts/run_odoo.sh
 ```
 
 The expected `HIT@10`, `RECALL@10`, `MRR@10`, and `NDCG@10` values are listed
@@ -116,19 +72,23 @@ in `RESULTS.md`.
 ## Repository Layout
 
 ```text
-r2join/prepare_data.py       Data validation, copying, and toy data creation
-r2join/train_retriever.py    Stage I bi-encoder training
-r2join/train_reranker.py     Stage II cross-encoder training
-r2join/evaluate.py           Hit, Recall, MRR, and NDCG evaluation
-sample_data/                 Tiny data for smoke tests
-DATA.md                      Dataset notes and expected formats
-RESULTS.md                   Main paper results
+r2join/mine_hard_negatives.py     Dataset preparation and rank-tiered negative mining
+r2join/train_stage1.py            Stage I bi-encoder training
+r2join/train_stage2.py            Stage II reranker training with hybrid loss
+r2join/evaluate_full_pipeline.py  Stage I + Stage II evaluation
+r2join/common.py                  Shared model, feature, metric, and IO utilities
+configs/                         Dataset config templates
+scripts/                         End-to-end commands for each dataset
+sample_data/                     Tiny data for schema checks
+DATA.md                          Dataset notes and expected formats
+RESULTS.md                       Main paper results
 ```
 
 ## Notes
 
-- The scripts accept local paths and avoid server-specific absolute paths.
+- The scripts accept local paths through JSON configs and avoid server-specific
+  absolute paths.
 - OpenData and WebTable are public datasets; this repository documents how to
   prepare them instead of redistributing large files.
-- Put large trained checkpoints in an external release location such as Zenodo,
-  Hugging Face, or GitHub Releases, then link them from `DATA.md`.
+- Odoo is not redistributed in this public repository; `configs/odoo.json`
+  expects an authorized processed copy in the documented format.

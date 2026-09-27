@@ -47,8 +47,8 @@ split_manifest.json
 ```json
 [
   {
-    "id": "table_a.city",
-    "text": "[Table] table_a; [Column] city; [Values] Paris, Lyon"
+    "id": "table_a.csv::city",
+    "text": "city contains 3 values (5, 4, 4.67): Paris, Lyon, Rome"
   }
 ]
 ```
@@ -57,7 +57,7 @@ split_manifest.json
 
 ```json
 {
-  "table_a.city": ["table_b.city_name"]
+  "table_a.csv::city": ["table_b.csv::city_name"]
 }
 ```
 
@@ -66,13 +66,13 @@ split_manifest.json
 ```json
 [
   {
-    "query_col": "table_a.city",
-    "positive_col": "table_b.city_name",
-    "query": "[Table] table_a; [Column] city; [Values] Paris, Lyon",
-    "positive": "[Table] table_b; [Column] city_name; [Values] Paris, Rome",
+    "query_col": "table_a.csv::city",
+    "positive_col": "table_b.csv::city_name",
+    "query": "city contains 3 values (5, 4, 4.67): Paris, Lyon, Rome",
+    "positive": "city_name contains 3 values (6, 4, 5.00): Paris, Rome, Berlin",
     "label": 1,
     "negatives_list": [
-      "[Table] table_c; [Column] country; [Values] France, Germany"
+      "country contains 3 values (7, 5, 6.33): France, Germany, Italy"
     ]
   }
 ]

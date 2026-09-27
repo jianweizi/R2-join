@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import random
+import shutil
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import nltk
 import pandas as pd
 from sentence_transformers import SentenceTransformer, util
 from tqdm import tqdm
@@ -50,6 +53,41 @@ def split_edges(edges, val_ratio: float, test_ratio: float, seed: int):
     return shuffled[n_test + n_val :], shuffled[n_test : n_test + n_val], shuffled[:n_test]
 
 
+def ensure_fresh_dir(path: Path, allow_overwrite: bool) -> None:
+    if path.exists():
+        existing = [item.name for item in path.iterdir() if item.name != "logs"]
+        if not existing:
+            return
+        if not allow_overwrite:
+            raise FileExistsError(
+                f"Refusing to overwrite existing output directory: {path}. "
+                "Use a different data_dir or pass --allow-overwrite."
+            )
+        for item in path.iterdir():
+            if item.name == "logs":
+                continue
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+    else:
+        path.mkdir(parents=True, exist_ok=False)
+
+
+def ensure_nltk_tokenizer() -> None:
+    try:
+        nltk.data.find("tokenizers/punkt")
+    except (LookupError, OSError):
+        nltk.download("punkt", quiet=True)
+    try:
+        nltk.data.find("tokenizers/punkt_tab")
+    except (LookupError, OSError):
+        try:
+            nltk.download("punkt_tab", quiet=True)
+        except Exception:
+            pass
+
+
 def read_column_text(file_path: Path, column_name: str, max_values: int) -> str:
     try:
         try:
@@ -65,18 +103,23 @@ def read_column_text(file_path: Path, column_name: str, max_values: int) -> str:
             return ""
         column_name = stripped[column_name.strip()]
 
-    values = df[column_name].dropna().astype(str)
-    if values.empty:
+    value_counts = df[column_name].astype(str).value_counts()
+    sorted_values = value_counts.index.tolist()
+    if not sorted_values:
         return ""
-    counts = values.value_counts()
-    shown_values = ", ".join(counts.index.tolist()[:max_values])
-    lengths = [len(str(value)) for value in counts.index.tolist()]
+
+    shown_values = ", ".join(sorted_values[:max_values])
+    lengths = [len(str(value)) for value in sorted_values]
     avg_len = sum(lengths) / len(lengths)
-    return (
-        f"[Table] {file_path.name}; [Column] {column_name}; [Stats] "
-        f"distinct={len(counts)}, max_len={max(lengths)}, min_len={min(lengths)}, avg_len={avg_len:.2f}; "
-        f"[Values] {shown_values}"
+    text = (
+        f"{column_name} contains {len(sorted_values)} values "
+        f"({max(lengths)}, {min(lengths)}, {avg_len}): {shown_values}"
     )
+    try:
+        tokens = nltk.word_tokenize(text)
+        return " ".join(tokens[:512])
+    except LookupError:
+        return " ".join(text.split()[:512])
 
 
 def resolve_table_path(table_name: str, raw_data_dirs: dict[str, str]) -> Path | None:
@@ -97,18 +140,17 @@ def build_public_dataset(config: dict, output_dir: Path):
     gt_file = Path(config["ground_truth_file"])
     raw_data_dirs = config["raw_data_dirs"]
     max_values = int(config.get("max_values_per_column", 100))
-    gt_df = pd.read_csv(gt_file, header=None)
+    gt_format = config.get("ground_truth_format", "opendata")
+    if gt_format == "webtable":
+        gt_df = pd.read_csv(gt_file)
+    else:
+        gt_df = pd.read_csv(gt_file, header=None)
     corpus = {}
     global_gt = defaultdict(set)
     edges = set()
     skipped = Counter()
 
-    for _, row in tqdm(gt_df.iterrows(), total=len(gt_df), desc="Parse ground truth"):
-        if len(row) < 4:
-            skipped["short_ground_truth_row"] += 1
-            continue
-        table1, table2 = str(row[0]).strip(), str(row[1]).strip()
-        col1, col2 = str(row[2]).strip(), str(row[3]).strip()
+    for table1, table2, col1, col2 in tqdm(list(iter_ground_truth_rows(gt_df, gt_format)), desc="Parse ground truth"):
         id1 = f"{table1}::{col1}"
         id2 = f"{table2}::{col2}"
         key = edge_key(id1, id2)
@@ -134,6 +176,27 @@ def build_public_dataset(config: dict, output_dir: Path):
 
     valid_edges = [(left, right) for left, right in edges if left in corpus and right in corpus]
     return corpus, valid_edges, global_gt, skipped
+
+
+def iter_ground_truth_rows(gt_df, gt_format: str):
+    webtable_columns = {"query_table", "candidate_table", "query_column", "candidate_column"}
+    if gt_format == "webtable" and webtable_columns.issubset(set(gt_df.columns)):
+        for _, row in gt_df.iterrows():
+            yield (
+                str(row["query_table"]).strip(),
+                str(row["candidate_table"]).strip(),
+                str(row["query_column"]).strip(),
+                str(row["candidate_column"]).strip(),
+            )
+    else:
+        for _, row in gt_df.iterrows():
+            if len(row) >= 4:
+                yield (
+                    str(row.iloc[0]).strip(),
+                    str(row.iloc[1]).strip(),
+                    str(row.iloc[2]).strip(),
+                    str(row.iloc[3]).strip(),
+                )
 
 
 def build_existing_split_dataset(config: dict, output_dir: Path):
@@ -185,8 +248,8 @@ def mine_hard_negatives(corpus, train_gt, global_gt, args, config):
     rng = random.Random(seed)
 
     model = SentenceTransformer(model_name)
-    corpus_ids = sorted(corpus)
-    corpus_texts = [corpus[col_id] for col_id in corpus_ids]
+    corpus_ids = list(corpus.keys())
+    corpus_texts = list(corpus.values())
     print(f"Encoding {len(corpus_ids)} columns with mining model: {model_name}")
     corpus_embeddings = model.encode(
         corpus_texts,
@@ -223,6 +286,7 @@ def mine_hard_negatives(corpus, train_gt, global_gt, args, config):
                     "query_col": qid,
                     "positive": corpus[pos_id],
                     "positive_col": pos_id,
+                    "negative": negative_texts[0],
                     "label": 1,
                     "negatives_list": negative_texts,
                 }
@@ -239,6 +303,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-negatives", type=int)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--skip-mining", action="store_true", help="Only write split files; do not mine negatives.")
+    parser.add_argument("--allow-overwrite", action="store_true", help="Allow replacing an existing output directory.")
     return parser.parse_args()
 
 
@@ -248,7 +313,9 @@ def main() -> None:
     seed = args.seed or int(config.get("seed", 42))
     set_seed(seed)
     output_dir = Path(args.output_dir or config.get("data_dir", "processed/dataset"))
-    output_dir.mkdir(parents=True, exist_ok=True)
+    allow_overwrite = args.allow_overwrite or bool(config.get("allow_overwrite", False))
+    ensure_fresh_dir(output_dir, allow_overwrite)
+    ensure_nltk_tokenizer()
     mode = config.get("prepare_mode", "lakebench_csv")
 
     if mode == "existing_split":
@@ -265,6 +332,9 @@ def main() -> None:
         dump_json(output_dir / "train_ground_truth.json", train_gt)
         dump_json(output_dir / "val_ground_truth.json", val_gt)
         dump_json(output_dir / "test_ground_truth.json", test_gt)
+        dump_json(output_dir / "train_edges_undirected.json", [list(edge) for edge in sorted(train_edges)])
+        dump_json(output_dir / "val_edges_undirected.json", [list(edge) for edge in sorted(val_edges)])
+        dump_json(output_dir / "test_edges_undirected.json", [list(edge) for edge in sorted(test_edges)])
         dump_json(output_dir / "train_positive_pairs.json", build_positive_pairs(train_edges, corpus))
         dump_json(output_dir / "val_positive_pairs.json", build_positive_pairs(val_edges, corpus))
         dump_json(output_dir / "test_positive_pairs.json", build_positive_pairs(test_edges, corpus))
@@ -283,6 +353,12 @@ def main() -> None:
         "prepare_mode": mode,
         "output_dir": str(output_dir),
         "seed": seed,
+        "split_method": "deduplicate ground truth as undirected edges, then split edges 80/10/10; labels are stored bidirectionally inside each split",
+        "val_ratio": float(config.get("val_ratio", 0.1)),
+        "test_ratio": float(config.get("test_ratio", 0.1)),
+        "top_k_retrieval": args.top_k_retrieval or int(config.get("top_k_retrieval", 100)),
+        "num_negs_per_query": args.num_negatives or int(config.get("num_negatives", 7)),
+        "mining_model": args.mining_model or config.get("mining_model", DEFAULT_STAGE1_MODEL),
         "corpus_rows": len(corpus),
         "train_gt_queries": len(train_gt),
         "val_gt_queries": len(val_gt),
@@ -292,7 +368,7 @@ def main() -> None:
     }
     dump_json(output_dir / "split_manifest.json", manifest)
     print("Done.")
-    print(manifest)
+    print(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

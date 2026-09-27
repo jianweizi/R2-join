@@ -56,8 +56,9 @@ def print_stage_table(stage_name: str, metrics: dict):
     print(f"\n{stage_name.upper()} performance:")
     print("Metric     | " + " | ".join(f"@{k:>2}" for k in metric_k) + " |")
     print("-" * (15 + 9 * len(metric_k)))
-    for metric_name in ["hit", "precision", "recall", "mrr", "map", "ndcg"]:
-        row = f"{metric_name.upper():<10} |"
+    for metric_name in ["acc", "precision", "recall", "mrr", "map", "ndcg"]:
+        display_name = "HIT" if metric_name == "acc" else metric_name.upper()
+        row = f"{display_name:<10} |"
         for k in metric_k:
             row += f" {metrics[str(k)][metric_name]:>6.4f} |"
         print(row)
@@ -77,6 +78,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--feature-dim", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--max-seq-length", type=int, default=None)
+    parser.add_argument("--allow-overwrite", action="store_true", help="Allow replacing an existing result file.")
     return parser.parse_args()
 
 
@@ -97,6 +99,13 @@ def main() -> None:
     feature_dim = args.feature_dim or int(config.get("stage2_feature_dim", 32))
     batch_size = args.batch_size or int(config.get("eval_batch_size", 32))
     max_seq_length = args.max_seq_length or int(config.get("stage2_max_seq_length", 512))
+    allow_overwrite = args.allow_overwrite or bool(config.get("allow_overwrite", False))
+
+    if output_file.exists() and not allow_overwrite:
+        raise FileExistsError(
+            f"Refusing to overwrite existing evaluation result file: {output_file}. "
+            "Use --allow-overwrite or choose another output file."
+        )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Data dir: {data_dir}")
@@ -124,7 +133,7 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(stage2_base_model)
     feature_extractor = FeatureExtractor(feature_dim)
 
-    zero_metrics = {k: {"hit": 0.0, "precision": 0.0, "recall": 0.0, "mrr": 0.0, "map": 0.0, "ndcg": 0.0} for k in metric_k}
+    zero_metrics = {k: {"acc": 0.0, "precision": 0.0, "recall": 0.0, "mrr": 0.0, "map": 0.0, "ndcg": 0.0} for k in metric_k}
     totals = {"stage1": {k: dict(v) for k, v in zero_metrics.items()}, "stage2": {k: dict(v) for k, v in zero_metrics.items()}}
 
     valid_queries = 0

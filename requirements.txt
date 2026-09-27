@@ -1,5 +1,6 @@
 numpy>=1.24
 pandas>=2.0
+nltk>=3.8
 torch>=2.0
 sentence-transformers>=2.6
 transformers>=4.40

@@ -176,7 +176,7 @@ class MultimodalCrossEncoder(nn.Module):
 
 def calculate_metrics(ranked_list: list[dict[str, Any]], true_set: set[str], k_list: list[int]):
     metrics = {
-        k: {"hit": 0.0, "precision": 0.0, "recall": 0.0, "mrr": 0.0, "map": 0.0, "ndcg": 0.0}
+        k: {"acc": 0.0, "precision": 0.0, "recall": 0.0, "mrr": 0.0, "map": 0.0, "ndcg": 0.0}
         for k in k_list
     }
     hit_indices = [idx for idx, item in enumerate(ranked_list) if item["id"] in true_set]
@@ -185,7 +185,7 @@ def calculate_metrics(ranked_list: list[dict[str, Any]], true_set: set[str], k_l
         current_hits = [idx for idx in hit_indices if idx < k]
         if not current_hits:
             continue
-        metrics[k]["hit"] = 1.0
+        metrics[k]["acc"] = 1.0
         metrics[k]["precision"] = len(current_hits) / k
         metrics[k]["recall"] = len(current_hits) / len(true_set)
         metrics[k]["mrr"] = 1.0 / (current_hits[0] + 1)

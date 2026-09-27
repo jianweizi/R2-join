@@ -58,12 +58,27 @@ python -m r2join.evaluate_full_pipeline --config configs/opendata.json
 
 ## Reproducing Main Results
 
-After preparing each dataset in the format described in `DATA.md`, run:
+After preparing each dataset in the format described in `DATA.md`, run the same
+four-step pipeline with the corresponding config:
 
 ```bash
-bash scripts/run_opendata.sh
-bash scripts/run_webtable.sh
-bash scripts/run_odoo.sh
+# OpenData
+python -m r2join.mine_hard_negatives --config configs/opendata.json
+python -m r2join.train_stage1 --config configs/opendata.json
+python -m r2join.train_stage2 --config configs/opendata.json
+python -m r2join.evaluate_full_pipeline --config configs/opendata.json
+
+# WebTable
+python -m r2join.mine_hard_negatives --config configs/webtable.json
+python -m r2join.train_stage1 --config configs/webtable.json
+python -m r2join.train_stage2 --config configs/webtable.json
+python -m r2join.evaluate_full_pipeline --config configs/webtable.json
+
+# Odoo
+python -m r2join.mine_hard_negatives --config configs/odoo.json
+python -m r2join.train_stage1 --config configs/odoo.json
+python -m r2join.train_stage2 --config configs/odoo.json
+python -m r2join.evaluate_full_pipeline --config configs/odoo.json
 ```
 
 The expected `HIT@10`, `RECALL@10`, `MRR@10`, and `NDCG@10` values are listed
@@ -78,7 +93,6 @@ r2join/train_stage2.py            Stage II reranker training with hybrid loss
 r2join/evaluate_full_pipeline.py  Stage I + Stage II evaluation
 r2join/common.py                  Shared model, feature, metric, and IO utilities
 configs/                         Dataset config templates
-scripts/                         End-to-end commands for each dataset
 sample_data/                     Tiny data for schema checks
 DATA.md                          Dataset notes and expected formats
 RESULTS.md                       Main paper results

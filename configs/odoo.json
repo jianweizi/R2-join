@@ -3,6 +3,7 @@
   "prepare_mode": "existing_split",
   "data_dir": "processed/odoo",
   "source_data_dir": "data/odoo",
+  "mining_model": "sentence-transformers/all-MiniLM-L6-v2",
   "stage1_base_model": "sentence-transformers/all-MiniLM-L6-v2",
   "stage2_base_model": "cross-encoder/ms-marco-MiniLM-L12-v2",
   "stage1_output_dir": "models/odoo/stage1_biencoder",

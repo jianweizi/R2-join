@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -170,6 +171,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--val-ratio", type=float, default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--num-workers", type=int, default=None)
+    parser.add_argument("--allow-overwrite", action="store_true", help="Allow replacing an existing output directory.")
     return parser.parse_args()
 
 
@@ -189,9 +191,17 @@ def main() -> None:
     val_ratio = args.val_ratio if args.val_ratio is not None else float(config.get("stage2_val_ratio", 0.1))
     seed = args.seed or int(config.get("seed", 42))
     num_workers = args.num_workers if args.num_workers is not None else int(config.get("num_workers", 4))
+    allow_overwrite = args.allow_overwrite or bool(config.get("allow_overwrite", False))
 
     set_seed(seed)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if output_dir.exists():
+        if not allow_overwrite:
+            raise FileExistsError(
+                f"Refusing to overwrite existing Stage II output directory: {output_dir}. "
+                "Use --allow-overwrite or choose another output directory."
+            )
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=False)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info("Data dir: %s", data_dir)
     logger.info("Stage II base model: %s", base_model)

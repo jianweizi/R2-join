@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import shutil
 from pathlib import Path
 
 from sentence_transformers import InputExample, SentenceTransformer, losses
@@ -79,6 +80,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hard-negatives-per-positive", type=int, default=None)
     parser.add_argument("--evaluation-steps", type=int, default=None)
     parser.add_argument("--no-amp", action="store_true", help="Disable mixed precision training.")
+    parser.add_argument("--allow-overwrite", action="store_true", help="Allow replacing an existing output directory.")
     return parser.parse_args()
 
 
@@ -96,10 +98,18 @@ def main() -> None:
         config.get("stage1_hard_negatives_per_positive", 2)
     )
     evaluation_steps = args.evaluation_steps or int(config.get("stage1_evaluation_steps", 500))
+    allow_overwrite = args.allow_overwrite or bool(config.get("allow_overwrite", False))
 
     logger.info("Data dir: %s", data_dir)
     logger.info("Stage I base model: %s", base_model)
     logger.info("Stage I output dir: %s", output_dir)
+    if output_dir.exists():
+        if not allow_overwrite:
+            raise FileExistsError(
+                f"Refusing to overwrite existing Stage I output directory: {output_dir}. "
+                "Use --allow-overwrite or choose another output directory."
+            )
+        shutil.rmtree(output_dir)
 
     model = SentenceTransformer(base_model)
     model.max_seq_length = max_seq_length

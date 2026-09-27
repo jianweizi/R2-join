@@ -1,0 +1,18 @@
+[
+  {
+    "id": "cities_a.city",
+    "text": "[Table] cities_a; [Column] city; [Type] text; [Values] Paris, Lyon, Berlin"
+  },
+  {
+    "id": "cities_b.city_name",
+    "text": "[Table] cities_b; [Column] city_name; [Type] text; [Values] Paris, Berlin, Rome"
+  },
+  {
+    "id": "countries.country",
+    "text": "[Table] countries; [Column] country; [Type] text; [Values] France, Germany, Italy"
+  },
+  {
+    "id": "airports.city",
+    "text": "[Table] airports; [Column] city; [Type] text; [Values] Paris, Lyon, Rome"
+  }
+]

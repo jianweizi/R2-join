@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+
+# Local outputs
+demo_processed/
+demo_models/
+processed/
+models/
+outputs/
+logs/
+
+# Large artifacts
+*.bin
+*.pt
+*.pth
+*.safetensors
+*.npy
+*.npz
+*.pkl
+*.tar.gz

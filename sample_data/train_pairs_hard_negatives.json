@@ -1,0 +1,16 @@
+[
+  {
+    "query_id": "cities_a.city",
+    "positive_id": "cities_b.city_name",
+    "hard_negatives": [
+      "countries.country"
+    ]
+  },
+  {
+    "query_id": "cities_a.city",
+    "positive_id": "airports.city",
+    "hard_negatives": [
+      "countries.country"
+    ]
+  }
+]

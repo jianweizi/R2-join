@@ -1,0 +1,6 @@
+{
+  "airports.city": [
+    "cities_a.city",
+    "cities_b.city_name"
+  ]
+}
